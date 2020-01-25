@@ -1,0 +1,140 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Dec 11 23:30:12 2019
+
+@author: chikki
+"""
+
+from sklearn.model_selection import train_test_split
+#from sklearn.linear_model import LogisticRegression
+import pandas as pd
+import numpy as np
+df=pd.read_csv("train.csv")
+df.head(5)
+#import matplotlib as plt
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec 
+import seaborn as sns
+x1=df.iloc[:,2:].sum()
+x=x1.dropna()
+
+#plot
+plt.figure(figsize=(8,4))
+ax= sns.barplot(x.index, x.values, alpha=0.8)
+plt.title("No. per class")
+plt.ylabel('No. of Occurrences', fontsize=12)
+plt.xlabel('Type ', fontsize=12)
+#adding the text labels
+rects = ax.patches
+labels = x.values
+for rect, label in zip(rects, labels):
+    height = rect.get_height()
+    ax.text(rect.get_x() + rect.get_width()/2, height + 5, label, ha='center', va='bottom')
+
+plt.show()
+
+
+df['label']='' # to create an empty column
+for col_name in df.columns:
+    df.loc[df[col_name]==1,'label']= "Toxic"
+print(df.head(10))
+
+
+df1=df.replace(r'^\s*$', np.nan, regex=True)
+df1['label'].fillna("Non toxic",inplace=True)
+df1.head(10)
+df1['label'].value_counts()
+
+toxic=len(df1[df1['label'] == "Toxic"])
+
+toxic= df1[df1['label'] == "Toxic"].index
+random_indices1 = np.random.choice(toxic,16225,replace=False)
+toxic_sample = df1.loc[random_indices1]
+
+nontoxic= df1[df1['label'] == "Non toxic"].index
+random_indices2 = np.random.choice(nontoxic,size=16225,replace=False)
+nontoxic_sample = df1.loc[random_indices2]
+
+under_sample_indices= np.concatenate([random_indices1,random_indices2])
+under_sample = df1.loc[under_sample_indices] 
+
+
+
+import nltk as nlp
+import re
+description_list = []
+for description in under_sample['comment_text']:
+    description = re.sub("[^a-zA-Z]"," ",description)
+    description = description.lower()   
+    description = nlp.word_tokenize(description)
+    #description = [ word for word in description if not word in set(stopwords.words("english"))]
+    lemma = nlp.WordNetLemmatizer()
+    description = [ lemma.lemmatize(word) for word in description]
+    description = " ".join(description)
+    description_list.append(description) 
+    
+    
+#We make bag of word it is including number of all word's info
+from sklearn.feature_extraction.text import CountVectorizer 
+max_features = 3000 #We use the most common word
+count_vectorizer = CountVectorizer(max_features = max_features, stop_words = "english")
+sparce_matrix = count_vectorizer.fit_transform(description_list).toarray()
+
+
+#We separate our data is train and test
+y = under_sample.iloc[:,8].values   
+x = sparce_matrix
+from sklearn.model_selection import train_test_split
+x_train, x_test, y_train, y_test = train_test_split(x,y, test_size = 0.1, random_state = 42)
+
+print("-------------Gaussian Naive Bayes------------------")
+
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import confusion_matrix,classification_report
+nb = GaussianNB()
+nb.fit(x_train,y_train)
+p=nb.predict(x_test)
+print("the accuracy of our model: {}".format(nb.score(x_test,y_test)))
+cm=confusion_matrix(y_test,p)
+print(cm)
+print(classification_report(p,y_test))
+
+
+print("---------------------KNN-------------------------------")
+
+from sklearn.neighbors import KNeighborsClassifier
+knn = KNeighborsClassifier(n_neighbors = 2)
+knn.fit(x_train,y_train)
+#print('Prediction: {}'.format(prediction))
+print('With KNN (K=2) accuracy is: ',knn.score(x_test,y_test))
+cm=confusion_matrix(y_test,p)
+print(cm)
+print(classification_report(p,y_test))
+
+
+print("---------------------Random forest classifier------------")
+
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix,classification_report
+lr = RandomForestClassifier()
+lr.fit(x_train,y_train)
+p=lr.predict(x_test)
+print("our accuracy is: {}".format(lr.score(x_test,y_test)))
+cm=confusion_matrix(y_test,p)
+print(cm)
+print(classification_report(p,y_test))
+
+
+print("-----------------------Logistic Regression-----------------")
+
+
+from sklearn.linear_model import LogisticRegression
+lr = LogisticRegression(max_iter = 400)
+lr.fit(x_train,y_train)
+p=lr.predict(x_test)
+print("our accuracy is: {}".format(lr.score(x_test,y_test)))
+cm=confusion_matrix(y_test,p)
+print(cm)
+print(classification_report(p,y_test))
+
